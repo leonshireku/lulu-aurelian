@@ -136,11 +136,17 @@ export const importICalSync = async (req, res, next) => {
     let content = icsContent;
 
     if (!content && icalUrl) {
+      let cleanUrl = String(icalUrl).trim();
+      // Handle Airbnb/Apple calendar links using webcal:// protocol
+      if (cleanUrl.toLowerCase().startsWith('webcal://')) {
+        cleanUrl = 'https://' + cleanUrl.slice(9);
+      }
+
       // Validate URL to prevent SSRF against localhost / cloud metadata
       try {
-        const parsed = new URL(icalUrl);
+        const parsed = new URL(cleanUrl);
         if (!['http:', 'https:'].includes(parsed.protocol)) {
-          return res.status(400).json({ error: 'Only HTTP/HTTPS protocols are allowed for iCal feeds.' });
+          return res.status(400).json({ error: 'Only HTTP/HTTPS/webcal protocols are allowed for iCal feeds.' });
         }
         const host = parsed.hostname.toLowerCase();
         if (
@@ -158,7 +164,8 @@ export const importICalSync = async (req, res, next) => {
         return res.status(400).json({ error: 'Invalid iCal feed URL format.' });
       }
 
-      const fetchRes = await fetch(icalUrl, {
+      const fetchRes = await fetch(cleanUrl, {
+        redirect: 'follow',
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 LuluAurelianCalendarSync/1.0',
           'Accept': 'text/calendar, text/plain, */*'
@@ -176,7 +183,12 @@ export const importICalSync = async (req, res, next) => {
 
     const events = parseICalData(content);
     if (events.length === 0) {
-      return res.status(400).json({ error: 'No valid events or dates found in iCal feed.' });
+      return res.status(200).json({
+        success: true,
+        message: `iCal feed verified for ${unitId.toUpperCase()}, but no active booked events were found.`,
+        blocks: [],
+        totalEvents: 0
+      });
     }
 
     // Fetch existing active bookings to deduplicate

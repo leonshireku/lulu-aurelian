@@ -31,18 +31,28 @@ app.set('trust proxy', true); // Required for express-rate-limit when hosted on 
 
 // --- SECURITY MIDDLEWARES ---
 app.use(helmet({
-  crossOriginOpenerPolicy: { policy: "unsafe-none" }, // Allows Google OAuth popup window.closed checks without browser warnings
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" }, // Allows Google OAuth popup window.closed checks without browser warnings
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// Rate limiting (max 100 requests per 15 mins per IP)
+// General API rate limiting (max 1000 requests per 15 mins per IP to support portal dashboards)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 1000,
   message: { success: false, error: 'Too many requests from this IP, please try again later.' },
   validate: { trustProxy: false, xForwardedForHeader: false, default: false }
 });
 app.use('/api', limiter);
+
+// Stricter rate limit for authentication endpoints to guard against brute-force attacks
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: { success: false, error: 'Too many authentication attempts. Please try again later.' },
+  validate: { trustProxy: false, xForwardedForHeader: false, default: false }
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
 
 // --- GLOBAL MIDDLEWARES ---
 const allowedOrigins = [

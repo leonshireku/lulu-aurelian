@@ -184,9 +184,14 @@ function UnitCalendarCard({ unit, bookings, setBookings, triggerToast }) {
   };
 
   const handleICalImport = async () => {
-    if (!icalImportUrl) {
+    let cleanUrl = (icalImportUrl || '').trim();
+    if (!cleanUrl) {
       triggerToast('Please enter an iCal feed URL.');
       return;
+    }
+    if (cleanUrl.toLowerCase().startsWith('webcal://')) {
+      cleanUrl = 'https://' + cleanUrl.slice(9);
+      setIcalImportUrl(cleanUrl);
     }
     triggerToast(`Syncing iCal feed for ${unit.name}...`);
 
@@ -196,7 +201,7 @@ function UnitCalendarCard({ unit, bookings, setBookings, triggerToast }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ unitId: unit.id, icalUrl: icalImportUrl })
+        body: JSON.stringify({ unitId: unit.id, icalUrl: cleanUrl })
       });
 
       const data = await response.json();
@@ -689,6 +694,8 @@ export default function ManagerPortal({ user, managerTab = 'pricing', onTabChang
   const [bookings, setBookings] = useState([]);
   useEffect(() => {
     const fetchBookings = async () => {
+      // Avoid firing background requests if tab is currently inactive
+      if (typeof document !== 'undefined' && document.hidden) return;
       try {
         const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/bookings`, {
           credentials: 'include'
@@ -701,7 +708,7 @@ export default function ManagerPortal({ user, managerTab = 'pricing', onTabChang
       } catch (err) {}
     };
     fetchBookings();
-    const interval = setInterval(fetchBookings, 8000);
+    const interval = setInterval(fetchBookings, 25000);
     return () => clearInterval(interval);
   }, []);
 

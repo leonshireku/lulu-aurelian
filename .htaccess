@@ -1,6 +1,11 @@
 # Apache Rewrite Rules for Lulu Aurelian Estate
 ErrorDocument 404 /404.html
 
+<IfModule mod_headers.c>
+  # Allow popups like Google OAuth to check window.closed without cross-origin policy block
+  Header set Cross-Origin-Opener-Policy "same-origin-allow-popups"
+</IfModule>
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
